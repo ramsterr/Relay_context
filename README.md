@@ -1,6 +1,6 @@
 # Context Handover
 
-Track and preserve context across LLM sessions.
+Track and preserve context across LLM sessions. Extracts semantic atoms from conversations, measures context drift, and ensures critical decisions survive session handovers.
 
 ## Install
 

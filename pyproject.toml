@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "context-handover"
 version = "0.1.0"
-description = "LLM Context Handover System - Track and preserve context across sessions"
+description = "Track and preserve context across LLM session handovers"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
