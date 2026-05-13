@@ -2,7 +2,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, asdict
+import uuid
+from dataclasses import dataclass, asdict, field
 from typing import Any, Optional, Callable
 from enum import Enum
 
@@ -17,6 +18,17 @@ except ImportError:
     REDIS_AVAILABLE = False
     logger.warning("redis not available - using asyncio.Queue only")
 
+from .retry_policy import (
+    RetryPolicy,
+    with_retry,
+    CircuitBreaker,
+    CircuitBreakerOpenError,
+    create_circuit_breaker,
+    LLM_RETRY_POLICY,
+    REDIS_RETRY_POLICY,
+)
+from .dlq import DeadLetterQueue, FailureReason, InMemoryDLQStorage
+
 
 class EventType(Enum):
     MESSAGE_RECEIVED = "message_received"
@@ -29,21 +41,27 @@ class ContextEvent:
     event_type: EventType
     session_id: str
     payload: dict
+    event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    created_at: float = field(default_factory=lambda: asyncio.get_event_loop().time() if asyncio.get_event_loop().is_running() else 0.0)
 
     def to_json(self) -> str:
         return json.dumps({
+            "event_id": self.event_id,
             "event_type": self.event_type.value,
             "session_id": self.session_id,
             "payload": self.payload,
+            "created_at": self.created_at,
         })
 
     @classmethod
     def from_json(cls, data: str) -> "ContextEvent":
         d = json.loads(data)
         return cls(
+            event_id=d.get("event_id", str(uuid.uuid4())),
             event_type=EventType(d["event_type"]),
             session_id=d["session_id"],
             payload=d["payload"],
+            created_at=d.get("created_at", 0.0),
         )
 
 
@@ -59,6 +77,11 @@ class AsyncContextPipeline:
         use_redis: bool = False,
         redis_url: str = "redis://localhost:6379",
         redis_queue_name: str = "context_events",
+        retry_policy: Optional[RetryPolicy] = None,
+        enable_dlq: bool = True,
+        dlq_storage=None,
+        circuit_breaker_threshold: int = 5,
+        circuit_breaker_timeout: float = 30.0,
     ):
         self.extractor = extractor
         self.registry = registry
@@ -71,6 +94,22 @@ class AsyncContextPipeline:
         self._worker_task: Optional[asyncio.Task] = None
         self.use_redis = use_redis
         self.redis_client = None
+        
+        # Retry and reliability configuration
+        self.retry_policy = retry_policy or LLM_RETRY_POLICY
+        self.enable_dlq = enable_dlq
+        self.dlq = DeadLetterQueue(storage=dlq_storage or InMemoryDLQStorage()) if enable_dlq else None
+        
+        # Circuit breakers for different operations
+        self._circuit_breakers = {
+            "llm": create_circuit_breaker("llm_calls", failure_threshold=circuit_breaker_threshold, recovery_timeout=circuit_breaker_timeout),
+            "embedding": create_circuit_breaker("embedding_calls", failure_threshold=circuit_breaker_threshold, recovery_timeout=circuit_breaker_timeout),
+            "redis": create_circuit_breaker("redis_ops", failure_threshold=circuit_breaker_threshold, recovery_timeout=circuit_breaker_timeout),
+        }
+        
+        # Idempotency tracking
+        self._processed_event_ids: set = set()
+        self._max_idempotency_cache_size = 10000
 
         if use_redis and REDIS_AVAILABLE:
             self._init_redis(redis_url, redis_queue_name)
@@ -117,15 +156,36 @@ class AsyncContextPipeline:
             },
         ))
 
+    def _check_idempotency(self, event: ContextEvent) -> bool:
+        """Check if event has already been processed (idempotency check)."""
+        if event.event_id in self._processed_event_ids:
+            logger.debug(f"Duplicate event detected: {event.event_id}")
+            return True
+        
+        # Add to processed set
+        self._processed_event_ids.add(event.event_id)
+        
+        # Prune if cache gets too large
+        if len(self._processed_event_ids) > self._max_idempotency_cache_size:
+            # Remove oldest 10% of entries (approximation via random sampling)
+            to_remove = set(list(self._processed_event_ids)[:int(self._max_idempotency_cache_size * 0.1)])
+            self._processed_event_ids -= to_remove
+        
+        return False
+    
     async def start_worker(self):
         self._running = True
         self._worker_task = asyncio.create_task(self._run_worker())
+        if self.dlq:
+            await self.dlq.start()
         logger.info("Context pipeline worker started")
 
     async def stop_worker(self):
         self._running = False
         if self._worker_task:
             await self._worker_task
+        if self.dlq:
+            await self.dlq.stop()
         logger.info("Context pipeline worker stopped")
 
     async def _run_worker(self):
@@ -139,12 +199,29 @@ class AsyncContextPipeline:
                 else:
                     event = await asyncio.wait_for(self.queue.get(), timeout=1.0)
 
+                # Check idempotency before processing
+                if self._check_idempotency(event):
+                    logger.debug(f"Skipping duplicate event: {event.event_id}")
+                    continue
+                
                 await self._process(event)
 
             except asyncio.TimeoutError:
                 continue
+            except CircuitBreakerOpenError as e:
+                logger.warning(f"Circuit breaker open: {e}")
+                # Don't retry - circuit is intentionally open
             except Exception as e:
-                logger.error(f"Worker error: {e}")
+                logger.error(f"Worker error: {e}", exc_info=True)
+                # Record to DLQ if enabled
+                if self.dlq and 'event' in locals():
+                    await self.dlq.record_failure(
+                        event=event,
+                        reason=FailureReason.UNKNOWN,
+                        error=str(e),
+                        attempts=1,
+                        metadata={"error_type": type(e).__name__},
+                    )
 
     async def _process(self, event: ContextEvent):
         logger.debug(f"Processing event: {event.event_type}")
@@ -160,16 +237,37 @@ class AsyncContextPipeline:
         if not self.extractor or not self.registry:
             return
 
-        content = event.payload.get("content", "")
-        candidates = self.extractor.extract(content)
+        try:
+            content = event.payload.get("content", "")
+            
+            # Use circuit breaker for extraction if it involves LLM calls
+            if hasattr(self.extractor, 'extract'):
+                candidates = await self._execute_with_circuit_breaker(
+                    "llm",
+                    lambda: self.extractor.extract(content)
+                )
+            else:
+                candidates = self.extractor.extract(content)
 
-        for candidate in candidates:
-            self.registry.insert_or_update(
-                candidate,
-                event.session_id,
-                event.payload.get("message_index", 0),
-                event.payload.get("total_messages", 1),
-            )
+            for candidate in candidates:
+                self.registry.insert_or_update(
+                    candidate,
+                    event.session_id,
+                    event.payload.get("message_index", 0),
+                    event.payload.get("total_messages", 1),
+                )
+                
+        except Exception as e:
+            logger.error(f"Failed to process message event: {e}", exc_info=True)
+            if self.dlq:
+                await self.dlq.record_failure(
+                    event=event,
+                    reason=FailureReason.NON_RETRYABLE_ERROR,
+                    error=str(e),
+                    attempts=1,
+                    metadata={"stage": "message_processing"},
+                )
+            raise
 
     async def _process_checkpoint(self, event: ContextEvent):
         level = event.payload.get("level", "standard")
@@ -221,8 +319,45 @@ class AsyncContextPipeline:
             "jaccard": jaccard,
             "composite": composite,
         }
+    
+    async def _execute_with_circuit_breaker(self, cb_name: str, func: callable) -> Any:
+        """Execute a function with circuit breaker protection."""
+        cb = self._circuit_breakers.get(cb_name)
+        if cb:
+            return await cb.execute(func)
+        return await func() if asyncio.iscoroutinefunction(func) else func()
+    
+    def get_circuit_breaker_states(self) -> dict[str, str]:
+        """Get current states of all circuit breakers."""
+        return {name: cb.state.value for name, cb in self._circuit_breakers.items()}
+    
+    def reset_circuit_breakers(self) -> None:
+        """Reset all circuit breakers to closed state."""
+        for cb in self._circuit_breakers.values():
+            cb.reset()
+    
+    async def get_dlq_metrics(self) -> Optional[dict]:
+        """Get DLQ metrics if enabled."""
+        if not self.dlq:
+            return None
+        return await self.dlq.get_metrics()
 
     async def _process_handover(self, event: ContextEvent):
         session_from = event.payload.get("session_from")
         session_to = event.payload.get("session_to")
         logger.info(f"Processing handover: {session_from} → {session_to}")
+        
+        try:
+            # Additional handover processing logic can be added here
+            pass
+        except Exception as e:
+            logger.error(f"Failed to process handover event: {e}", exc_info=True)
+            if self.dlq:
+                await self.dlq.record_failure(
+                    event=event,
+                    reason=FailureReason.NON_RETRYABLE_ERROR,
+                    error=str(e),
+                    attempts=1,
+                    metadata={"stage": "handover_processing"},
+                )
+            raise
