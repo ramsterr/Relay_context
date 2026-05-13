@@ -1,9 +1,9 @@
-__pycache__/
-*.pyc
-.pytest_cache/
-.env
-*.egg-info/
-dist/
-build/
-.eggs/
-*.log
+# Examples
+CHANGES_PHASE1.md
+IMPROVEMENT_PLAN.md
+
+# Test files
+tests/test_drift.py
+
+# Source files
+src/context_handover/measurement/drift.py
