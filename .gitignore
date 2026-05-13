@@ -1,9 +1,38 @@
-# Examples
-CHANGES_PHASE1.md
-IMPROVEMENT_PLAN.md
+```
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Test files
-tests/test_drift.py
+# Dependencies
+.venv/
+venv/
+env/
+.env
+.env.local
+.env.*
 
-# Source files
-src/context_handover/measurement/drift.py
+# Logs
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+build/
+dist/
+*.egg-info/
+```
