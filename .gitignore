@@ -1,7 +1,1 @@
-```
-# Documentation
-docs/
-
-# Original rules preserved
-*.log
-```
+Nothing needs to be added to .gitignore since only a README.md file was modified and there are no build artifacts, dependencies, or temporary files in the changes.
