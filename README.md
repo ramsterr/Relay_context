@@ -2,7 +2,7 @@
 
 <div align="center">
 
-# Context Handover
+
 
 **Preserve Semantic Continuity Across LLM Session Boundaries.** 🐱
 
