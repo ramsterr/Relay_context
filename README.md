@@ -4,7 +4,9 @@
 
 
 
-**Preserve Semantic Continuity Across LLM Session Boundaries.** 🐱
+**fear loosing details? Rely on Relay** 🐱
+
+*Preserve Semantic Continuity Across LLM Session Boundaries*
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-0877d2?style=for-the-badge)](LICENSE)
