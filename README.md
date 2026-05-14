@@ -1,4 +1,4 @@
-
+![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1)%20(1).png)
 
 <div align="center">
 
@@ -11,7 +11,7 @@
 [![Status](https://img.shields.io/badge/status-production--ready-success?style=for-the-badge)]()
 [![Quality Score](https://img.shields.io/badge/quality-8.9/10-f39c12?style=for-the-badge)]()
 
-![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1)%20(1).png)
+
 
 </div>
 
