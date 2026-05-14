@@ -31,6 +31,17 @@
 
 </div>
 
+---
+
+<div align="center">
+
+![Context Handover Banner](docs/assets/banner.png)
+
+*Figure: Semantic atoms flowing through the context handover pipeline, optimizing token usage while preserving meaning.*
+
+</div>
+
+---
 
 ## Visual Overview
 
@@ -453,7 +464,5 @@ MIT License - see [LICENSE](LICENSE) for details.
 <div align="center">
 
 **Built with ❤️ for the future of agentic memory.** 🐱
-
-[Report Bug](../../issues) · [Request Feature](../../issues) · [Join Discord](#)
 
 </div>
