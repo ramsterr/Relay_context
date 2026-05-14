@@ -199,10 +199,32 @@ observability:
 
 ## 📚 Documentation & Resources
 
-*   [📖 Full API Reference](docs/api.md)
-*   [🎥 Video Tutorial: Understanding Atoms](docs/tutorials/atoms.mp4)
-*   [🧪 Running Benchmarks](docs/benchmarks.md)
-*   [🎨 Customizing Visualizations](docs/viz.md)
+### 📘 User Guide
+The complete guide to understanding and using Context Handover.
+- **[Read the Full User Guide](docs/USER_GUIDE.md)** - Includes:
+  - 5-minute quick start walkthrough
+  - Deep dive into Semantic Atoms lifecycle
+  - Architecture diagrams explained
+  - Advanced tuning for Drift & Budgets
+  - Visualization dashboard guide
+
+### 🔌 API Reference
+Detailed documentation for all classes and methods.
+- [API Reference](docs/api.md) - Coming soon
+
+### 🧪 Examples
+Ready-to-run code snippets for common use cases.
+```bash
+# Run the demo
+python examples/run_demo.py
+
+# Run benchmark suite
+python examples/benchmark.py
+```
+
+### 🎨 Customizing Visualizations
+Learn how to extend the dashboard with custom panels.
+- [Visualization Guide](docs/viz.md) - Coming soon
 
 ---
 
