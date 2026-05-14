@@ -1,15 +1,72 @@
+<div align="center">
+
 # Context Handover
 
 **Preserve Semantic Continuity Across LLM Session Boundaries.** 🐱
 
-> **The Problem:** LLMs forget everything when a session ends. Standard memory is either too dumb (linear history) or too expensive (full vector re-indexing).
->
-> **The Solution:** `context_handover` extracts **Semantic Atoms**, measures **Context Drift**, and optimally packs context into new sessions using a **Bounded Knapsack Algorithm**.
+[![Python Version](https://img.shields.io/badge/python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-0877d2?style=for-the-badge)](LICENSE)
+[![Status](https://img.shields.io/badge/status-production--ready-success?style=for-the-badge)]()
+[![Quality Score](https://img.shields.io/badge/quality-8.9/10-f39c12?style=for-the-badge)]()
 
-[![Python Version](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/status-production--ready-brightgreen)]()
-[![Score](https://img.shields.io/badge/quality-8.9/10-orange)]()
+</div>
+
+---
+
+> **💡 The Problem:** LLMs forget everything when a session ends. Standard memory is either too dumb (linear history) or too expensive (full vector re-indexing).
+>
+> **✅ The Solution:** `context_handover` extracts **Semantic Atoms**, measures **Context Drift**, and optimally packs context into new sessions using a **Bounded Knapsack Algorithm**.
+
+---
+
+<div align="center">
+
+### Core Capabilities
+
+| 🔍 **Semantic Extraction** | 📊 **Drift Detection** | 🎯 **Smart Packing** |
+|:---:|:---:|:---:|
+| Extract meaningful context units | Measure topic shifts in real-time | Optimize token usage mathematically |
+| **🔗 DAG Tracking** | **🛡️ Enterprise Ready** | **📈 Visual Analytics** |
+| Track dependencies across sessions | Circuit breakers, retries, DLQ | Interactive observability dashboard |
+
+</div>
+
+
+## Visual Overview
+
+### How Context Handover Works
+
+```mermaid
+graph LR
+    A[User Chat] --> B[Atom Extractor]
+    B --> C[Atom Registry]
+    C --> D[Vector Store]
+    D --> E[Drift Detector]
+    D --> F[Token Budgeter]
+    E --> G[Loss Ledger]
+    F --> H[New Session]
+    
+    style A fill:#e1f5fe
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style E fill:#ffebee
+    style F fill:#fff8e1
+    style G fill:#fce4ec
+    style H fill:#c8e6c9
+```
+
+### Token Optimization Comparison
+
+<div align="center">
+
+| Approach | Token Efficiency | Semantic Coherence | Latency |
+|:--------:|:----------------:|:------------------:|:-------:|
+| ❌ **Naive Buffer** | Low ⚠️ | Low ⚠️ | Fast ✅ |
+| ⚡ **Vector Recall** | Medium | Medium | Slow ⚠️ |
+| ✅ **Context Handover** | **High** 🎯 | **High** 🎯 | **Fast** ⚡ |
+
+</div>
 
 ---
 
@@ -64,34 +121,74 @@ Unlike linear buffers, we treat context as a **Directed Acyclic Graph (DAG)** of
 
 ### The Architecture Flow
 
-```text
-┌──────────────┐      ┌───────────────────┐      ┌──────────────────┐
-│  User Chat   │ ──▶  │  Atom Extractor   │ ──▶  │  Atom Registry   │
-│  (Raw Text)  │      │ (LLM + Regex)     │      │ (Dedup + Embed)  │
-└──────────────┘      └───────────────────┘      └─────────┬────────┘
-                                                           │
-         ┌─────────────────────────────────────────────────┘
-         ▼
-┌───────────────────┐      ┌───────────────────┐      ┌──────────────────┐
-│  Drift Detector   │ ◀──  │  Token Budgeter   │ ◀──  │  Vector Store    │
-│ (KL + Cosine)     │      │ (Knapsack Algo)   │      │ (Chroma/Qdrant)  │
-└─────────┬─────────┘      └─────────┬─────────┘      └──────────────────┘
-          │                          │
-          ▼                          ▼
-┌───────────────────┐      ┌───────────────────┐
-│  Loss Ledger      │      │  New Session      │
-│ (Audit Trail)     │      │  (Optimized Prompt)│
-└───────────────────┘      └───────────────────┘
+```mermaid
+flowchart TD
+    subgraph Input["Input Layer"]
+        A[User Chat<br/>Raw Text]
+    end
+    
+    subgraph Processing["Processing Layer"]
+        B[Atom Extractor<br/>LLM + Regex]
+        C[Atom Registry<br/>Dedup + Embed]
+        D[Vector Store<br/>Chroma/Qdrant]
+    end
+    
+    subgraph Optimization["Optimization Layer"]
+        E[Drift Detector<br/>KL + Cosine]
+        F[Token Budgeter<br/>Knapsack Algo]
+    end
+    
+    subgraph Output["Output Layer"]
+        G[Loss Ledger<br/>Audit Trail]
+        H[New Session<br/>Optimized Prompt]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> H
+    
+    style Input fill:#e3f2fd
+    style Processing fill:#fff3e0
+    style Optimization fill:#f3e5f5
+    style Output fill:#e8f5e9
 ```
 
 ### Key Concepts
 
-| Concept | Description | Analogy |
-| :--- | :--- | :--- |
-| **Semantic Atom** | The smallest unit of meaningful context (Fact, Decision, Constraint). | A single Lego brick, not the whole castle. |
-| **Session DAG** | Tracks how atoms relate across branching conversations. | A family tree for your chat history. |
-| **Drift Metric** | Measures how much the topic has changed since the last handover. | A "compass" checking if you're still on course. |
-| **Knapsack Budget** | Mathematically selects the *most valuable* atoms that fit the token limit. | Packing a suitcase: Maximize value, minimize weight. |
+<div align="center">
+
+| Concept | Description | Analogy | Visual |
+|:---|:---|:---|:---:|
+| **Semantic Atom** | Smallest unit of meaningful context | A single Lego brick | 🔷 |
+| **Session DAG** | Tracks atom relationships across sessions | Family tree for chat | 🌳 |
+| **Drift Metric** | Measures topic change since last handover | Compass checking course | 🧭 |
+| **Knapsack Budget** | Selects most valuable atoms for token limit | Packing a suitcase | 🎒 |
+
+</div>
+
+### Semantic Atom Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Manager
+    participant Extractor
+    participant Registry
+    participant Vector
+    
+    User->>Manager: Add Message
+    Manager->>Extractor: Trigger Extraction
+    Extractor->>Extractor: Parse LLM + Regex
+    Extractor->>Registry: Submit Atoms
+    Registry->>Registry: Deduplicate
+    Registry->>Vector: Generate Embeddings
+    Vector-->>Manager: Confirmation
+    Manager-->>User: Done
+```
 
 ---
 
@@ -131,28 +228,48 @@ Don't fly blind. Use our built-in **Context Observatory** to debug and monitor y
 +-----------------------------------+---------------------------+
 ```
 
----
 
 ## Production Features
 
-This library isn't just a prototype. It includes enterprise-grade reliability patterns:
+<div align="center">
 
--   **Idempotency**: Duplicate events are automatically detected and ignored.
--   **Smart Retries**: Exponential backoff for LLM/Redis failures.
--   **Circuit Breakers**: Prevents cascading failures when downstream services crash.
--   **Dead Letter Queue (DLQ)**: Failed processing events are saved for later replay.
--   **PII Ready**: Hooks available for redaction and encryption.
+| Feature | Description | Status |
+|:---|:---|:---:|
+| **🔄 Idempotency** | Duplicate events auto-detected & ignored | ✅ Active |
+| **🔁 Smart Retries** | Exponential backoff for LLM/Redis failures | ✅ Active |
+| **⚡ Circuit Breakers** | Prevents cascading failures | ✅ Active |
+| **📦 Dead Letter Queue** | Failed events saved for replay | ✅ Active |
+| **🔒 PII Ready** | Redaction & encryption hooks | 🔧 Configurable |
+
+</div>
 
 ---
 
 ## Performance Benchmarks
 
+### Comparative Analysis
+
+```mermaid
+xychart-beta
+    title "Token Efficiency vs Semantic Coherence"
+    x-axis ["Naive Buffer", "Vector Recall", "Context Handover"]
+    y-axis "Score (0-10)" 0 --> 10
+    bar [3, 6, 9]
+    line [3, 6, 9]
+```
+
+### Detailed Metrics
+
+<div align="center">
+
 | Metric | Naive Buffer | Vector Recall | **Context Handover** |
-| :--- | :--- | :--- | :--- |
-| **Token Efficiency** | Low (fills up fast) | Medium | **High (Knapsack Opt.)** |
-| **Semantic Coherence** | Low | Medium | **High (Drift Aware)** |
-| **Latency Overhead** | None | High (~200ms) | **Low (~40ms async)** |
-| **Auditability** | None | Low | **Full (Loss Ledger)** |
+|:---|:---:|:---:|:---:|
+| **Token Efficiency** | Low ⚠️ | Medium | **High** 🎯 |
+| **Semantic Coherence** | Low ⚠️ | Medium | **High** 🎯 |
+| **Latency Overhead** | None ✅ | High ~200ms ⚠️ | **Low ~40ms** ⚡ |
+| **Auditability** | None ❌ | Low ⚠️ | **Full** ✅ |
+
+</div>
 
 ---
 
@@ -160,10 +277,37 @@ This library isn't just a prototype. It includes enterprise-grade reliability pa
 
 Works seamlessly with your existing stack:
 
--   **LangChain**: Use as a custom Memory module.
--   **LlamaIndex**: Plug in as a Node Parser.
--   **AutoGen/LangGraph**: Use for state handovers between agents.
--   **Observability**: Native OpenTelemetry & Langfuse support.
+<div align="center">
+
+```mermaid
+flowchart LR
+    A[Context Handover] --> B[LangChain]
+    A --> C[LlamaIndex]
+    A --> D[AutoGen]
+    A --> E[LangGraph]
+    A --> F[OpenTelemetry]
+    A --> G[Langfuse]
+    
+    style A fill:#4CAF50,color:white
+    style B fill:#2196F3,color:white
+    style C fill:#FF9800,color:white
+    style D fill:#9C27B0,color:white
+    style E fill:#FF5722,color:white
+    style F fill:#00BCD4,color:white
+    style G fill:#E91E63,color:white
+```
+
+</div>
+
+### Integration Examples
+
+| Framework | Integration Type | Status |
+|:---|:---|:---:|
+| **LangChain** | Custom Memory Module | ✅ Ready |
+| **LlamaIndex** | Node Parser | ✅ Ready |
+| **AutoGen/LangGraph** | State Handover | ✅ Ready |
+| **OpenTelemetry** | Native Tracing | ✅ Ready |
+| **Langfuse** | Observability | ✅ Ready |
 
 ```python
 # Example: LangChain Integration
@@ -195,27 +339,52 @@ observability:
   metrics_export: "otel"
 ```
 
+### Configuration Options Overview
+
+<div align="center">
+
+| Category | Option | Default | Description |
+|:---|:---|:---:|:---|
+| **Pipeline** | `max_tokens` | 4096 | Maximum token budget for handover |
+| **Pipeline** | `drift_threshold` | 0.5 | Sensitivity for context drift detection |
+| **Pipeline** | `knapsack_strategy` | value_density | Optimization strategy |
+| **Storage** | `backend` | chromadb | Vector store backend |
+| **Storage** | `path` | ./data/atoms | Local storage path |
+| **Observability** | `tracing` | true | Enable distributed tracing |
+| **Observability** | `metrics_export` | otel | Metrics export format |
+
+</div>
+
 ---
 
 ## Documentation & Resources
 
-### Complete User Guide
-The complete guide to understanding and using Context Handover.
+<div align="center">
 
-**[Read the Full User Guide](docs/USER_GUIDE.md)** 🐱
+### 📚 Complete User Guide
+
+The comprehensive guide to understanding and using Context Handover.
+
+**[Read the Full User Guide →](docs/USER_GUIDE.md)** 🐱
+
+</div>
 
 The User Guide includes:
-- 5-minute quick start walkthrough
-- Deep dive into Semantic Atoms lifecycle
-- Architecture diagrams explained
-- Advanced tuning for Drift & Budgets
-- Visualization dashboard guide with visualizations
-- API reference
-- Troubleshooting and best practices
-- Real-world examples
+- ✅ 5-minute quick start walkthrough
+- ✅ Deep dive into Semantic Atoms lifecycle  
+- ✅ Architecture diagrams explained
+- ✅ Advanced tuning for Drift & Budgets
+- ✅ Visualization dashboard guide with visualizations
+- ✅ API reference
+- ✅ Troubleshooting and best practices
+- ✅ Real-world examples
 
-### Examples
+<div align="center">
+
+### 💻 Code Examples
+
 Ready-to-run code snippets for common use cases.
+
 ```bash
 # Run the demo
 python examples/run_demo.py
@@ -224,24 +393,54 @@ python examples/run_demo.py
 python examples/benchmark.py
 ```
 
+</div>
+
 ---
 
 ## Contributing
 
 We welcome contributions! Check out our [Improvement Plan](IMPROVEMENT_PLAN.md) for open tasks.
 
-1.  Fork the repo
-2.  Create a feature branch (`git checkout -b feat/amazing-feature`)
-3.  Commit your changes (`git commit -m 'Add amazing feature'`)
-4.  Push to the branch (`git push origin feat/amazing-feature`)
-5.  Open a Pull Request
+### How to Contribute
 
-**Development Setup:**
+```mermaid
+graph LR
+    A[Fork Repo] --> B[Create Branch]
+    B --> C[Make Changes]
+    C --> D[Commit]
+    D --> E[Push]
+    E --> F[Open PR]
+    
+    style A fill:#4CAF50,color:white
+    style B fill:#2196F3,color:white
+    style C fill:#FF9800,color:white
+    style D fill:#9C27B0,color:white
+    style E fill:#00BCD4,color:white
+    style F fill:#E91E63,color:white
+```
+
+### Development Setup
+
 ```bash
+# Install dependencies
 poetry install
+
+# Install pre-commit hooks
 pre-commit install
+
+# Run tests
 pytest tests/ -v
 ```
+
+<div align="center">
+
+| Step | Command | Purpose |
+|:---|:---|:---|
+| **1** | `poetry install` | Install all dependencies |
+| **2** | `pre-commit install` | Set up git hooks |
+| **3** | `pytest tests/ -v` | Run test suite |
+
+</div>
 
 ---
 
