@@ -1,4 +1,4 @@
-![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1)(1).png)
+![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image (1)(1).png)
 
 <div align="center">
 
