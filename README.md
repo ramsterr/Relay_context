@@ -1,3 +1,5 @@
+![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1).png)
+
 <div align="center">
 
 # Context Handover
@@ -28,16 +30,6 @@
 | Extract meaningful context units | Measure topic shifts in real-time | Optimize token usage mathematically |
 | **🔗 DAG Tracking** | **🛡️ Enterprise Ready** | **📈 Visual Analytics** |
 | Track dependencies across sessions | Circuit breakers, retries, DLQ | Interactive observability dashboard |
-
-</div>
-
----
-
-<div align="center">
-
-![Context Handover Banner](docs/assets/banner.png)
-
-*Figure: Semantic atoms flowing through the context handover pipeline, optimizing token usage while preserving meaning.*
 
 </div>
 
