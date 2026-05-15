@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Handover | Preserve Semantic Continuity Across LLM Sessions</title>
+    <meta name="description" content="Context Handover extracts Semantic Atoms, measures Context Drift, and optimally packs context into new sessions using a Bounded Knapsack Algorithm.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #121212;
+            --bg-tertiary: #1a1a1a;
+            --bg-card: #151515;
+            --bg-card-hover: #1e1e1e;
+            --accent-primary: #c41e3a;
+            --accent-secondary: #8b1528;
+            --accent-tertiary: #ff2d4f;
+            --accent-glow: rgba(196, 30, 58, 0.4);
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --border-color: #2a2a2a;
+            --border-glow: rgba(196, 30, 58, 0.3);
+            --gradient-hero: linear-gradient(135deg, #0a0a0a 0%, #1a0a0f 50%, #0a0a0a 100%);
+            --gradient-card: linear-gradient(145deg, #151515 0%, #1a1a1a 100%);
+            --gradient-accent: linear-gradient(90deg, #c41e3a 0%, #ff2d4f 50%, #c41e3a 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(10, 10, 10, 0.85);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 0;
+        }
+
+        nav .container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--gradient-accent);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--accent-primary);
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: var(--gradient-hero);
+            padding: 8rem 0 4rem;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(ellipse 80% 50% at 50% -20%, var(--accent-glow), transparent),
+                radial-gradient(ellipse 60% 40% at 80% 60%, rgba(139, 21, 40, 0.2), transparent),
+                radial-gradient(ellipse 50% 30% at 20% 80%, rgba(196, 30, 58, 0.15), transparent);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(196, 30, 58, 0.15);
+            border: 1px solid var(--border-glow);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            color: var(--accent-tertiary);
+            margin-bottom: 2rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .hero-badge::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--accent-tertiary);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .hero h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(2.5rem, 6vw, 4.5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-tertiary) 50%, var(--text-primary) 100%);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            to { background-position: 200% center; }
+        }
+
+        .hero h1 span {
+            color: var(--accent-primary);
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1rem;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--gradient-accent);
+            color: white;
+            box-shadow: 0 4px 20px var(--accent-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px var(--accent-glow);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--accent-primary);
+            background: rgba(196, 30, 58, 0.1);
+        }
+
+        /* Problem/Solution Section */
+        .problem-solution {
+            padding: 6rem 0;
+            background: var(--bg-secondary);
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-label {
+            display: inline-block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .section-subtitle {
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--gradient-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--gradient-accent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--border-glow);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(196, 30, 58, 0.15);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .card.problem {
+            border-left: 3px solid var(--text-muted);
+        }
+
+        .card.solution {
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 0;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .features-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 640px) {
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--accent-secondary);
+        }
+
+        .feature-icon {
+            font-size: 1.75rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        /* Architecture Section */
+        .architecture {
+            padding: 6rem 0;
+            background: var(--bg-secondary);
+        }
+
+        .diagram-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-top: 2rem;
+            overflow-x: auto;
+        }
+
+        .diagram-container h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            color: var(--text-secondary);
+        }
+
+        /* How It Works */
+        .how-it-works {
+            padding: 6rem 0;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .step {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+        }
+
+        .step-number {
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            background: var(--gradient-accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .step-content h3 {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .step-content p {
+            color: var(--text-secondary);
+        }
+
+        .step-content code {
+            display: block;
+            margin-top: 1rem;
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-tertiary);
+            overflow-x: auto;
+        }
+
+        /* Comparison Section */
+        .comparison {
+            padding: 6rem 0;
+            background: var(--bg-secondary);
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 2rem;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 1.25rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .comparison-table th {
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .comparison-table td {
+            font-size: 0.95rem;
+        }
+
+        .comparison-table tr:hover {
+            background: var(--bg-card);
+        }
+
+        .comparison-table .highlight {
+            color: var(--accent-tertiary);
+            font-weight: 600;
+        }
+
+        .comparison-table .score {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .score-bar {
+            width: 60px;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        .score-bar-fill.low { background: #666; }
+        .score-bar-fill.medium { background: #f39c12; }
+        .score-bar-fill.high { background: var(--accent-primary); }
+
+        /* Integrations */
+        .integrations {
+            padding: 6rem 0;
+        }
+
+        .integration-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .integration-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .integration-item:hover {
+            border-color: var(--accent-secondary);
+            transform: translateY(-2px);
+        }
+
+        .integration-item .icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .integration-item h4 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .integration-item p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        /* Code Section */
+        .code-preview {
+            padding: 6rem 0;
+            background: var(--bg-secondary);
+        }
+
+        .code-block {
+            background: #0d0d0d;
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+            margin-top: 2rem;
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .code-header h4 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .code-header span {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--accent-primary);
+        }
+
+        .code-content {
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        .code-content pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        .code-content .keyword { color: #ff79c6; }
+        .code-content .import { color: #8be9fd; }
+        .code-content .string { color: #f1fa8c; }
+        .code-content .comment { color: #6272a4; }
+        .code-content .function { color: #50fa7b; }
+        .code-content .class { color: #ffb86c; }
+
+        /* CTA Section */
+        .cta {
+            padding: 8rem 0;
+            text-align: center;
+            position: relative;
+            background: var(--gradient-hero);
+        }
+
+        .cta::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .cta h2 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            position: relative;
+        }
+
+        .cta p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        /* Footer */
+        footer {
+            padding: 3rem 0;
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        footer p {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent-primary);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.6s ease forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        /* Mermaid Customization */
+        .mermaid {
+            display: flex;
+            justify-content: center;
+        }
+
+        .mermaid svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="#" class="logo">
+                <div class="logo-icon">⚡</div>
+                <span>Context Handover</span>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#comparison">Benchmarks</a></li>
+                <li><a href="#integrations">Integrations</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">Production Ready · MIT Licensed</div>
+            <h1>Preserve Semantic Continuity<br><span>Across LLM Session Boundaries</span></h1>
+            <p>Context Handover extracts Semantic Atoms, measures Context Drift, and optimally packs context into new sessions using a Bounded Knapsack Algorithm.</p>
+            <div class="hero-buttons">
+                <a href="https://pypi.org/project/context-handover/" class="btn btn-primary" target="_blank">
+                    <span>📦</span> Install via PyPI
+                </a>
+                <a href="https://github.com/ramsterr/RELAY_context" class="btn btn-secondary" target="_blank">
+                    <span>★</span> Star on GitHub
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem/Solution Section -->
+    <section class="problem-solution" id="problem">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">The Challenge</span>
+                <h2 class="section-title">The Problem & Solution</h2>
+                <p class="section-subtitle">LLMs forget everything when a session ends. Standard memory is either too dumb or too expensive.</p>
+            </div>
+            <div class="cards-grid">
+                <div class="card problem">
+                    <div class="card-icon">❌</div>
+                    <h3>The Problem</h3>
+                    <p>LLMs have no persistent memory across sessions. When a conversation ends, all context is lost. Existing solutions either use linear history (too dumb) or full vector re-indexing (too expensive).</p>
+                </div>
+                <div class="card solution">
+                    <div class="card-icon">✅</div>
+                    <h3>Our Solution</h3>
+                    <p>Context Handover extracts <strong>Semantic Atoms</strong>, measures <strong>Context Drift</strong>, and optimally packs context using a <strong>Bounded Knapsack Algorithm</strong> for maximum efficiency.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Capabilities</span>
+                <h2 class="section-title">Core Features</h2>
+                <p class="section-subtitle">Powerful tools for managing LLM context across sessions</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔍</div>
+                    <h3>Semantic Extraction</h3>
+                    <p>Extract meaningful context units from conversations using LLM + Regex parsing</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Drift Detection</h3>
+                    <p>Measure topic shifts in real-time using KL Divergence and Cosine similarity</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>Smart Packing</h3>
+                    <p>Optimize token usage mathematically with value-density knapsack algorithm</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔗</div>
+                    <h3>DAG Tracking</h3>
+                    <p>Track dependencies across sessions using directed acyclic graphs</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🛡️</div>
+                    <h3>Enterprise Ready</h3>
+                    <p>Circuit breakers, retries, dead letter queue, and idempotency guarantees</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Visual Analytics</h3>
+                    <p>Interactive observability dashboard for debugging and monitoring</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Architecture Section -->
+    <section class="architecture" id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">System Design</span>
+                <h2 class="section-title">Architecture Flow</h2>
+                <p class="section-subtitle">How Context Handover processes and preserves semantic context</p>
+            </div>
+            <div class="diagram-container">
+                <h3>Processing Pipeline</h3>
+                <div class="mermaid">
+                    <pre class="mermaid">
+flowchart TD
+    subgraph Input["Input Layer"]
+        A[User Chat<br/>Raw Text]
+    end
+    
+    subgraph Processing["Processing Layer"]
+        B[Atom Extractor<br/>LLM + Regex]
+        C[Atom Registry<br/>Dedup + Embed]
+        D[Vector Store<br/>Chroma/Qdrant]
+    end
+    
+    subgraph Optimization["Optimization Layer"]
+        E[Drift Detector<br/>KL + Cosine]
+        F[Token Budgeter<br/>Knapsack Algo]
+    end
+    
+    subgraph Output["Output Layer"]
+        G[Loss Ledger<br/>Audit Trail]
+        H[New Session<br/>Optimized Prompt]
+    end
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    D --> F
+    E --> G
+    F --> H
+    
+    style Input fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style Processing fill:#1a1a1a,stroke:#8b1528,color:#fff
+    style Optimization fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style Output fill:#1a1a1a,stroke:#8b1528,color:#fff
+    style A fill:#2a1a1a,stroke:#c41e3a,color:#fff
+    style B fill:#2a1a1a,stroke:#c41e3a,color:#fff
+    style C fill:#2a1a1a,stroke:#c41e3a,color:#fff
+    style D fill:#2a1a1a,stroke:#c41e3a,color:#fff
+    style E fill:#2a1a1a,stroke:#c41e3a,color:#fff
+    style F fill:#2a1a1a,stroke:#c41e3a,color:#fff
+                    </pre>
+                </div>
+            </div>
+            
+            <div class="diagram-container" style="margin-top: 2rem;">
+                <h3>Data Flow</h3>
+                <div class="mermaid">
+                    <pre class="mermaid">
+graph LR
+    A[User Chat] --> B[Atom Extractor]
+    B --> C[Atom Registry]
+    C --> D[Vector Store]
+    D --> E[Drift Detector]
+    D --> F[Token Budgeter]
+    E --> G[Loss Ledger]
+    F --> H[New Session]
+    
+    style A fill:#1a1a1a,stroke:#ff2d4f,color:#fff
+    style B fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style C fill:#1a1a1a,stroke:#8b1528,color:#fff
+    style D fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style E fill:#1a1a1a,stroke:#ff2d4f,color:#fff
+    style F fill:#1a1a1a,stroke:#8b1528,color:#fff
+    style G fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style H fill:#1a1a1a,stroke:#ff2d4f,color:#fff
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Key Concepts Section -->
+    <section class="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Fundamentals</span>
+                <h2 class="section-title">Key Concepts</h2>
+            </div>
+            <div class="features-grid" style="margin-top: 2rem;">
+                <div class="feature-card">
+                    <div class="feature-icon">🔷</div>
+                    <h3>Semantic Atom</h3>
+                    <p>The smallest unit of meaningful context. Like a single Lego brick that can be recombined.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🌳</div>
+                    <h3>Session DAG</h3>
+                    <p>Directed Acyclic Graph tracking atom relationships across sessions like a family tree.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🧭</div>
+                    <h3>Drift Metric</h3>
+                    <p>Measures topic change since last handover, like a compass checking your course.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🎒</div>
+                    <h3>Knapsack Budget</h3>
+                    <p>Mathematically selects the most valuable atoms for the token limit, like packing a suitcase.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Getting Started</span>
+                <h2 class="section-title">How It Works</h2>
+                <p class="section-subtitle">Three simple steps to preserve context across sessions</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <h3>Initialize & Add Messages</h3>
+                        <p>Create a SessionManager and add your conversation messages. The system automatically tracks context as it's built.</p>
+                        <code>from context_handover import SessionManager
+
+manager = SessionManager(session_id="session_001")
+manager.add_message(role="user", content="I want to build a rocket engine using methane.")
+manager.add_message(role="assistant", content="Understood. Methane (CH4) offers high specific impulse...")</code>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <h3>Extract Semantic Atoms</h3>
+                        <p>Automatically extract meaningful context units from your conversation history. Atoms capture semantic meaning, not just raw text.</p>
+                        <code># Extract atoms automatically
+atoms = manager.extract_atoms()
+print(f"Extracted {len(atoms)} semantic atoms.")</code>
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <h3>Build Handover Package</h3>
+                        <p>Create an optimized context package for the new session. The Knapsack algorithm ensures maximum value within token limits.</p>
+                        <code># Handover to a new session (preserving context)
+new_session_pkg = manager.build_handover_package()
+manager.handover_to_new_session("session_002", new_session_pkg)</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Comparison Section -->
+    <section class="comparison" id="comparison">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Performance</span>
+                <h2 class="section-title">Why Context Handover?</h2>
+                <p class="section-subtitle">Compare our approach with existing solutions</p>
+            </div>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Approach</th>
+                        <th>Token Efficiency</th>
+                        <th>Semantic Coherence</th>
+                        <th>Latency</th>
+                        <th>Auditability</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>❌ Naive Buffer</td>
+                        <td>
+                            <div class="score">
+                                <span>Low</span>
+                                <div class="score-bar"><div class="score-bar-fill low" style="width: 30%"></div></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="score">
+                                <span>Low</span>
+                                <div class="score-bar"><div class="score-bar-fill low" style="width: 30%"></div></div>
+                            </div>
+                        </td>
+                        <td>Fast ✅</td>
+                        <td>None ❌</td>
+                    </tr>
+                    <tr>
+                        <td>⚡ Vector Recall</td>
+                        <td>
+                            <div class="score">
+                                <span>Medium</span>
+                                <div class="score-bar"><div class="score-bar-fill medium" style="width: 60%"></div></div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="score">
+                                <span>Medium</span>
+                                <div class="score-bar"><div class="score-bar-fill medium" style="width: 60%"></div></div>
+                            </div>
+                        </td>
+                        <td>Slow ~200ms ⚠️</td>
+                        <td>Low ⚠️</td>
+                    </tr>
+                    <tr>
+                        <td class="highlight">✅ Context Handover</td>
+                        <td class="highlight">
+                            <div class="score">
+                                <span>High 🎯</span>
+                                <div class="score-bar"><div class="score-bar-fill high" style="width: 90%"></div></div>
+                            </div>
+                        </td>
+                        <td class="highlight">
+                            <div class="score">
+                                <span>High 🎯</span>
+                                <div class="score-bar"><div class="score-bar-fill high" style="width: 90%"></div></div>
+                            </div>
+                        </td>
+                        <td class="highlight">Fast ~40ms ⚡</td>
+                        <td class="highlight">Full ✅</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- Integrations Section -->
+    <section class="integrations" id="integrations">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Ecosystem</span>
+                <h2 class="section-title">Works With Your Stack</h2>
+                <p class="section-subtitle">Seamless integration with popular frameworks</p>
+            </div>
+            <div class="diagram-container" style="margin-top: 2rem;">
+                <h3>Integration Architecture</h3>
+                <div class="mermaid">
+                    <pre class="mermaid">
+flowchart LR
+    A[Context Handover] --> B[LangChain]
+    A --> C[LlamaIndex]
+    A --> D[AutoGen]
+    A --> E[LangGraph]
+    A --> F[OpenTelemetry]
+    A --> G[Langfuse]
+    
+    style A fill:#c41e3a,color:white
+    style B fill:#1a1a1a,stroke:#2196F3,color:#fff
+    style C fill:#1a1a1a,stroke:#FF9800,color:#fff
+    style D fill:#1a1a1a,stroke:#9C27B0,color:#fff
+    style E fill:#1a1a1a,stroke:#FF5722,color:#fff
+    style F fill:#1a1a1a,stroke:#00BCD4,color:#fff
+    style G fill:#1a1a1a,stroke:#E91E63,color:#fff
+                    </pre>
+                </div>
+            </div>
+            <div class="integration-grid">
+                <div class="integration-item">
+                    <div class="icon">⛓️</div>
+                    <h4>LangChain</h4>
+                    <p>Custom Memory Module</p>
+                </div>
+                <div class="integration-item">
+                    <div class="icon">📄</div>
+                    <h4>LlamaIndex</h4>
+                    <p>Node Parser</p>
+                </div>
+                <div class="integration-item">
+                    <div class="icon">🤖</div>
+                    <h4>AutoGen</h4>
+                    <p>State Handover</p>
+                </div>
+                <div class="integration-item">
+                    <div class="icon">📊</div>
+                    <h4>OpenTelemetry</h4>
+                    <p>Native Tracing</p>
+                </div>
+                <div class="integration-item">
+                    <div class="icon">📈</div>
+                    <h4>Langfuse</h4>
+                    <p>Observability</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Production Features Section -->
+    <section class="features" style="background: var(--bg-secondary);">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Enterprise</span>
+                <h2 class="section-title">Production Ready</h2>
+                <p class="section-subtitle">Built for reliability at scale</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Idempotency</h3>
+                    <p>Duplicate events auto-detected & ignored</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔁</div>
+                    <h3>Smart Retries</h3>
+                    <p>Exponential backoff for LLM/Redis failures</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Circuit Breakers</h3>
+                    <p>Prevents cascading failures</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📦</div>
+                    <h3>Dead Letter Queue</h3>
+                    <p>Failed events saved for replay</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>PII Ready</h3>
+                    <p>Redaction & encryption hooks</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Full Auditability</h3>
+                    <p>Complete loss ledger for compliance</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Semantic Atom Lifecycle Section -->
+    <section class="how-it-works" id="lifecycle">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Workflow</span>
+                <h2 class="section-title">Semantic Atom Lifecycle</h2>
+                <p class="section-subtitle">How atoms move through the system</p>
+            </div>
+            <div class="diagram-container" style="margin-top: 2rem;">
+                <div class="mermaid">
+                    <pre class="mermaid">
+sequenceDiagram
+    participant User
+    participant Manager
+    participant Extractor
+    participant Registry
+    participant Vector
+    
+    User->>Manager: Add Message
+    Manager->>Extractor: Trigger Extraction
+    Extractor->>Extractor: Parse LLM + Regex
+    Extractor->>Registry: Submit Atoms
+    Registry->>Registry: Deduplicate
+    Registry->>Vector: Generate Embeddings
+    Vector-->>Manager: Confirmation
+    Manager-->>User: Done
+    
+    style User fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style Manager fill:#1a1a1a,stroke:#ff2d4f,color:#fff
+    style Extractor fill:#1a1a1a,stroke:#8b1528,color:#fff
+    style Registry fill:#1a1a1a,stroke:#c41e3a,color:#fff
+    style Vector fill:#1a1a1a,stroke:#ff2d4f,color:#fff
+                    </pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Code Example Section -->
+    <section class="code-preview">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Example</span>
+                <h2 class="section-title">Quick Start</h2>
+                <p class="section-subtitle">Get up and running in minutes</p>
+            </div>
+            <div class="code-block">
+                <div class="code-header">
+                    <h4>context_handover_example.py</h4>
+                    <span>Python</span>
+                </div>
+                <div class="code-content">
+                    <pre><span class="import">from</span> context_handover <span class="import">import</span> SessionManager, SemanticAtom
+
+<span class="comment"># Initialize manager</span>
+manager = <span class="function">SessionManager</span>(session_id=<span class="string">"session_001"</span>)
+
+<span class="comment"># Add meaningful interactions</span>
+manager.<span class="function">add_message</span>(
+    role=<span class="string">"user"</span>, 
+    content=<span class="string">"I want to build a rocket engine using methane."</span>
+)
+manager.<span class="function">add_message</span>(
+    role=<span class="string">"assistant"</span>, 
+    content=<span class="string">"Understood. Methane (CH4) offers high specific impulse..."</span>
+)
+
+<span class="comment"># Extract atoms automatically</span>
+atoms = manager.<span class="function">extract_atoms</span>() 
+<span class="function">print</span>(<span class="string">f"Extracted {len(atoms)} semantic atoms."</span>)
+
+<span class="comment"># Handover to a new session</span>
+new_session_pkg = manager.<span class="function">build_handover_package</span>()
+manager.<span class="function">handover_to_new_session</span>(<span class="string">"session_002"</span>, new_session_pkg)</pre>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Preserve Context?</h2>
+            <p>Start building intelligent memory for your LLM applications today.</p>
+            <div class="hero-buttons">
+                <a href="https://pypi.org/project/context-handover/" class="btn btn-primary" target="_blank">
+                    <span>📦</span> pip install context-handover
+                </a>
+                <a href="https://github.com/ramsterr/RELAY_context" class="btn btn-secondary" target="_blank">
+                    <span>📖</span> Read the Docs
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Built with ❤️ for the future of agentic memory. · <a href="https://github.com/ramsterr/RELAY_context">GitHub</a> · MIT License</p>
+        </div>
+    </footer>
+
+    <!-- Initialize Mermaid -->
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'dark',
+            themeVariables: {
+                primaryColor: '#c41e3a',
+                primaryTextColor: '#ffffff',
+                primaryBorderColor: '#8b1528',
+                lineColor: '#ff2d4f',
+                secondaryColor: '#1a1a1a',
+                tertiaryColor: '#121212',
+                background: '#0a0a0a',
+                mainBkg: '#1a1a1a',
+                nodeBorder: '#c41e3a',
+                clusterBkg: '#121212',
+                clusterBorder: '#2a2a2a',
+                titleColor: '#ffffff',
+                edgeLabelBackground: '#0a0a0a'
+            },
+            flowchart: {
+                curve: 'basis',
+                padding: 20
+            },
+            sequence: {
+                actorMargin: 50,
+                boxMargin: 10
+            }
+        });
+    </script>
+</body>
+</html>
