@@ -158,6 +158,40 @@
             overflow: hidden;
         }
 
+        .relay-logo {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(4rem, 12vw, 8rem);
+            font-weight: 800;
+            letter-spacing: 0.15em;
+            margin-bottom: 1.5rem;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+            position: relative;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        .relay-logo::after {
+            content: 'RELAY';
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: var(--gradient-accent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            filter: blur(30px);
+            opacity: 0.5;
+            z-index: -1;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 20px var(--accent-glow)); }
+            to { filter: drop-shadow(0 0 40px var(--accent-glow)); }
+        }
+
         .hero::before {
             content: '';
             position: absolute;
@@ -788,6 +822,7 @@
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-content">
+            <div class="relay-logo">RELAY</div>
             <div class="hero-badge">Production Ready · MIT Licensed</div>
             <h1>Preserve Semantic Continuity<br><span>Across LLM Session Boundaries</span></h1>
             <p>Context Handover extracts Semantic Atoms, measures Context Drift, and optimally packs context into new sessions using a Bounded Knapsack Algorithm.</p>
