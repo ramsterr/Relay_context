@@ -1,17 +1,17 @@
 
 
+![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1)%20(1).png)
+
 <div align="center">
 
 # Context Handover
 
-**Preserve Semantic Continuity Across LLM Session Boundaries.** 🐱
+**Preserve Semantic Continuity Across LLM Session Boundaries.**
 
 [![Python Version](https://img.shields.io/badge/python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-0877d2?style=for-the-badge)](LICENSE)
 [![Status](https://img.shields.io/badge/status-production--ready-success?style=for-the-badge)]()
 [![Quality Score](https://img.shields.io/badge/quality-8.9/10-f39c12?style=for-the-badge)]()
-
-![Context Handover Banner](docs/assets/a3206414-85a6-4b20-9c4a-c81bcba3df12_image%20(1)%20(1).png)
 
 </div>
 
